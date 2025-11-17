@@ -31,29 +31,22 @@ This Streamlit dashboard provides a user-friendly interface for analyzing Amazon
 
 ## Features
 
-### 🏠 Home
+### Home
 - Overview of the dashboard features
 - Quick statistics
 
-### 🔍 Sentiment Analysis
+###  Sentiment Analysis
 - **Single Review**: Analyze individual reviews with sentiment classification
 - **Batch Analysis**: Process multiple reviews at once
 - View processed text and sentiment results
 
-### 📈 Data Exploration
+### Data Exploration
 - Load sample review data
 - Filter by category and rating
 - View detailed review information
 - Explore dataset structure
 
-### 📊 Statistics
-- Comprehensive visualizations
-- Sentiment distribution charts
-- Rating analysis
-- Category-wise statistics
-- Text length analysis
-
-### ⚙️ About
+### About
 - Project information
 - Team members
 - Data source details

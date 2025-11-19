@@ -552,13 +552,6 @@ elif page == "🔍 Sentiment Analysis":
             placeholder="Type your product review here..."
         )
         
-        # Rating input (optional)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            rating = st.slider("Rating (1-5 stars)", 1, 5, 3)
-        with col2:
-            show_rating = st.checkbox("Use rating", value=False)
-        
         if st.button("Analyze Sentiment", type="primary"):
             if review_text:
                 with st.spinner("Processing review..."):
@@ -566,15 +559,11 @@ elif page == "🔍 Sentiment Analysis":
                     processed_text = preprocess_text(review_text)
                     
                     # Get sentiment
-                    if show_rating:
-                        sentiment = create_sentiment_label(rating)
-                        confidence = "Based on rating"
-                    else:
-                        sentiment, confidence = analyze_sentiment_simple(review_text)
+                    sentiment, confidence = analyze_sentiment_simple(review_text)
                     
                     # Display results
                     st.markdown("### Results")
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2 = st.columns(2)
                     
                     with col1:
                         sentiment_emoji = {"positive": "😊", "negative": "😞", "neutral": "😐"}
@@ -586,9 +575,6 @@ elif page == "🔍 Sentiment Analysis":
                         """, unsafe_allow_html=True)
                     
                     with col2:
-                        st.metric("Rating", f"{rating} ⭐")
-                    
-                    with col3:
                         st.metric("Confidence", confidence)
                     
                     # Show processed text with all preprocessing steps from notebook
@@ -617,112 +603,44 @@ elif page == "🔍 Sentiment Analysis":
     else:  # Batch Analysis
         st.subheader("Batch Analysis")
         
-        # File upload or manual input
-        input_method = st.radio(
-            "Input method:",
-            ["Manual Entry", "Load Sample Data"],
-            horizontal=True
+        reviews_input = st.text_area(
+            "Enter multiple reviews (one per line):",
+            height=200,
+            placeholder="Review 1\nReview 2\nReview 3\n..."
         )
         
-        if input_method == "Manual Entry":
-            reviews_input = st.text_area(
-                "Enter multiple reviews (one per line):",
-                height=200,
-                placeholder="Review 1\nReview 2\nReview 3\n..."
-            )
-            
-            if st.button("Analyze Batch", type="primary"):
-                if reviews_input:
-                    reviews_list = [r.strip() for r in reviews_input.split("\n") if r.strip()]
-                    
-                    results = []
-                    for review in reviews_list:
-                        processed = preprocess_text(review)
-                        sentiment, _ = analyze_sentiment_simple(review)
-                        results.append({
-                            "Review": review[:100] + "..." if len(review) > 100 else review,
-                            "Sentiment": sentiment,
-                            "Processed": processed[:50] + "..." if len(processed) > 50 else processed
-                        })
-                    
-                    results_df = pd.DataFrame(results)
-                    st.dataframe(results_df, use_container_width=True)
-                    
-                    # Sentiment distribution
-                    sentiment_counts = results_df['Sentiment'].value_counts()
-                    fig = px.pie(
-                        values=sentiment_counts.values,
-                        names=sentiment_counts.index,
-                        title="Sentiment Distribution",
-                        color_discrete_map={
-                            "positive": "#28a745",
-                            "negative": "#dc3545",
-                            "neutral": "#FF9900"
-                        }
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-        else:
-            if st.button("Load Sample Data", type="primary"):
-                with st.spinner("Loading sample data..."):
-                    sample_data = load_sample_data()
-                    if sample_data is not None and len(sample_data) > 0:
-                        st.session_state.sample_data = sample_data
-                        st.success(f"Loaded {len(sample_data)} sample reviews!")
-                    else:
-                        st.warning("Could not load sample data. Please try manual entry.")
-            
-            if st.session_state.sample_data is not None:
-                st.subheader("Sample Data Analysis")
-                sample_df = st.session_state.sample_data
+        if st.button("Analyze Batch", type="primary"):
+            if reviews_input:
+                reviews_list = [r.strip() for r in reviews_input.split("\n") if r.strip()]
                 
-                # Analyze sample
-                if st.button("Analyze Sample Data", type="primary"):
-                    with st.spinner("Analyzing reviews..."):
-                        sample_df['sentiment'] = sample_df['text'].apply(
-                            lambda x: analyze_sentiment_simple(x)[0]
-                        )
-                        sample_df['processed_text'] = sample_df['text'].apply(preprocess_text)
-                        st.session_state.processed_data = sample_df
+                results = []
+                for review in reviews_list:
+                    processed = preprocess_text(review)
+                    sentiment, _ = analyze_sentiment_simple(review)
+                    results.append({
+                        "Review": review[:100] + "..." if len(review) > 100 else review,
+                        "Sentiment": sentiment,
+                        "Processed": processed[:50] + "..." if len(processed) > 50 else processed
+                    })
                 
-                if st.session_state.processed_data is not None:
-                    processed_df = st.session_state.processed_data
-                    
-                    # Display results
-                    st.dataframe(
-                        processed_df[['rating', 'title', 'text', 'sentiment', 'category']].head(20),
-                        use_container_width=True
-                    )
-                    
-                    # Visualizations
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        sentiment_counts = processed_df['sentiment'].value_counts()
-                        fig1 = px.bar(
-                            x=sentiment_counts.index,
-                            y=sentiment_counts.values,
-                            title="Sentiment Distribution",
-                            labels={'x': 'Sentiment', 'y': 'Count'},
-                            color=sentiment_counts.index,
-                            color_discrete_map={
-                                "positive": "#2ecc71",
-                                "negative": "#e74c3c",
-                                "neutral": "#f39c12"
-                            }
-                        )
-                        st.plotly_chart(fig1, use_container_width=True)
-                    
-                    with col2:
-                        rating_counts = processed_df['rating'].value_counts().sort_index()
-                        fig2 = px.bar(
-                            x=rating_counts.index,
-                            y=rating_counts.values,
-                            title="Rating Distribution",
-                            labels={'x': 'Rating', 'y': 'Count'},
-                            color=rating_counts.values,
-                            color_continuous_scale="Oranges"
-                        )
-                        st.plotly_chart(fig2, use_container_width=True)
+                results_df = pd.DataFrame(results)
+                st.dataframe(results_df, use_container_width=True)
+                
+                # Sentiment distribution
+                sentiment_counts = results_df['Sentiment'].value_counts()
+                fig = px.pie(
+                    values=sentiment_counts.values,
+                    names=sentiment_counts.index,
+                    title="Sentiment Distribution",
+                    color_discrete_map={
+                        "positive": "#28a745",
+                        "negative": "#dc3545",
+                        "neutral": "#FF9900"
+                    }
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("Please enter at least one review to analyze.")
 
 # Data Exploration Page
 elif page == "📈 Data Exploration":

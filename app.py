@@ -29,6 +29,12 @@ st.set_page_config(
     }
 )
 
+# Ensure something always renders
+try:
+    st.write("✅ Dashboard is running...")
+except Exception as e:
+    st.error(f"Error: {e}")
+
 # Custom CSS with Amazon colors and modern design
 st.markdown("""
     <style>
@@ -487,12 +493,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title with Amazon branding
-st.markdown("""
-    <div style="text-align: center; padding: 2rem 0;">
-        <h1 class="main-header">📊 Amazon Review Sentiment Analysis Dashboard</h1>
-        <p style="color: #666; font-size: 1.1rem; margin-top: -1rem;">Powered by AI • Extract Insights from Customer Reviews</p>
-    </div>
-""", unsafe_allow_html=True)
+st.title("📊 Amazon Review Sentiment Analysis Dashboard")
+st.caption("Powered by AI • Extract Insights from Customer Reviews")
 st.markdown("---")
 
 # Sidebar navigation

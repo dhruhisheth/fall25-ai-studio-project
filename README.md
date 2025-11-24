@@ -12,17 +12,6 @@ This project classifies Amazon product reviews into **Positive**, **Neutral**, o
 
 Future updates will add **BERT**, **RoBERTa**, and **DistilBERT** for transformer-based performance improvements.
 
-## 🗂️ Repository Structure
-AI-Studio-Project/
-├── app.py                # Streamlit app (UI)
-├── utils.py              # Preprocessing + backend functions
-├── models/               # Trained ML models
-├── data/                 # Sample datasets / HF loaders
-├── notebooks/            # Jupyter notebooks for analysis
-├── requirements.txt      # Dependencies
-├── STREAMLIT_README.md   # How to run Streamlit
-└── README.md
-
 ## 🎛️ Features
 
 ### 🔍 Sentiment Analysis

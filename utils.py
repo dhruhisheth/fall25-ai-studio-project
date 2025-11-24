@@ -11,6 +11,23 @@ import fsspec
 from itertools import islice
 from collections import Counter
 import re
+import os
+import torch
+import numpy as np
+
+# Transformer model imports (optional - will fail gracefully if not installed)
+try:
+    from transformers import (
+        BertForSequenceClassification, 
+        BertTokenizer,
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+        pipeline
+    )
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("Warning: transformers library not available. Install with: pip install transformers torch")
 
 # Download NLTK data (only once)
 try:
@@ -168,6 +185,264 @@ def analyze_sentiment_simple(text: str) -> tuple[str, str]:
         return 'negative', 'medium'
     else:
         return 'neutral', 'low'
+
+
+# Global model cache to avoid reloading models
+_model_cache = {}
+
+
+def load_bert_model(model_path: str = None, model_name: str = "bert-base-cased"):
+    """
+    Load BERT model for sentiment analysis
+    If model_path is provided, loads fine-tuned model, otherwise loads pretrained
+    
+    Args:
+        model_path: Path to fine-tuned model checkpoint (optional)
+        model_name: HuggingFace model name (default: bert-base-cased)
+    
+    Returns:
+        (model, tokenizer) tuple or None if loading fails
+    """
+    if not TRANSFORMERS_AVAILABLE:
+        return None, None
+    
+    cache_key = f"bert_{model_path or model_name}"
+    
+    if cache_key in _model_cache:
+        return _model_cache[cache_key]
+    
+    try:
+        if model_path and model_path.strip() and os.path.exists(model_path.strip()):
+            # Load fine-tuned model
+            model_path = model_path.strip()
+            model = BertForSequenceClassification.from_pretrained(model_path)
+            tokenizer = BertTokenizer.from_pretrained(model_path)
+        else:
+            # Load pretrained model
+            model = BertForSequenceClassification.from_pretrained(
+                model_name, 
+                num_labels=3
+            )
+            tokenizer = BertTokenizer.from_pretrained(model_name)
+        
+        model.eval()  # Set to evaluation mode
+        _model_cache[cache_key] = (model, tokenizer)
+        return model, tokenizer
+    except Exception as e:
+        print(f"Error loading BERT model: {e}")
+        return None, None
+
+
+def load_twitter_roberta_model(model_name: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"):
+    """
+    Load Twitter RoBERTa model for sentiment analysis
+    
+    Args:
+        model_name: HuggingFace model name
+    
+    Returns:
+        (model, tokenizer) tuple or None if loading fails
+    """
+    if not TRANSFORMERS_AVAILABLE:
+        return None, None
+    
+    cache_key = f"roberta_{model_name}"
+    
+    if cache_key in _model_cache:
+        return _model_cache[cache_key]
+    
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        model.eval()
+        _model_cache[cache_key] = (model, tokenizer)
+        return model, tokenizer
+    except Exception as e:
+        print(f"Error loading Twitter RoBERTa model: {e}")
+        return None, None
+
+
+def load_sentiment_pipeline(model_name: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"):
+    """
+    Load HuggingFace pipeline for sentiment analysis (easiest to use)
+    
+    Args:
+        model_name: HuggingFace model name
+    
+    Returns:
+        Pipeline object or None if loading fails
+    """
+    if not TRANSFORMERS_AVAILABLE:
+        return None
+    
+    cache_key = f"pipeline_{model_name}"
+    
+    if cache_key in _model_cache:
+        return _model_cache[cache_key]
+    
+    try:
+        sentiment_pipeline = pipeline(
+            "sentiment-analysis",
+            model=model_name,
+            device=0 if torch.cuda.is_available() else -1
+        )
+        _model_cache[cache_key] = sentiment_pipeline
+        return sentiment_pipeline
+    except Exception as e:
+        print(f"Error loading sentiment pipeline: {e}")
+        return None
+
+
+def analyze_sentiment_bert(text: str, model_path: str = None, model_name: str = "bert-base-cased") -> tuple[str, float]:
+    """
+    Analyze sentiment using BERT model
+    Returns (sentiment, confidence_score)
+    
+    Args:
+        text: Review text to analyze
+        model_path: Path to fine-tuned model (optional)
+        model_name: HuggingFace model name
+    
+    Returns:
+        (sentiment_label, confidence) tuple
+    """
+    if not TRANSFORMERS_AVAILABLE:
+        return analyze_sentiment_simple(text)[0], 0.5
+    
+    model, tokenizer = load_bert_model(model_path, model_name)
+    
+    if model is None or tokenizer is None:
+        return analyze_sentiment_simple(text)[0], 0.5
+    
+    try:
+        # Preprocess text (use clean_review pipeline)
+        clean_text = create_clean_review(text)
+        
+        # Tokenize
+        inputs = tokenizer(
+            clean_text,
+            padding=True,
+            truncation=True,
+            max_length=128,
+            return_tensors="pt"
+        )
+        
+        # Predict
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+            probs = torch.nn.functional.softmax(logits, dim=-1)
+            predicted_class = logits.argmax(dim=-1).item()
+            confidence = probs[0][predicted_class].item()
+        
+        # Map to sentiment labels (0: negative, 1: neutral, 2: positive)
+        label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+        sentiment = label_map.get(predicted_class, 'neutral')
+        
+        return sentiment, confidence
+    except Exception as e:
+        print(f"Error in BERT prediction: {e}")
+        return analyze_sentiment_simple(text)[0], 0.5
+
+
+def analyze_sentiment_roberta(text: str, model_name: str = "cardiffnlp/twitter-roberta-base-sentiment-latest") -> tuple[str, float]:
+    """
+    Analyze sentiment using Twitter RoBERTa model
+    Returns (sentiment, confidence_score)
+    
+    Args:
+        text: Review text to analyze
+        model_name: HuggingFace model name
+    
+    Returns:
+        (sentiment_label, confidence) tuple
+    """
+    if not TRANSFORMERS_AVAILABLE:
+        return analyze_sentiment_simple(text)[0], 0.5
+    
+    # Try using pipeline first (easier)
+    pipeline_model = load_sentiment_pipeline(model_name)
+    
+    if pipeline_model:
+        try:
+            result = pipeline_model(text)[0]
+            label = result['label'].lower()
+            score = result['score']
+            
+            # Map labels to our format
+            if 'positive' in label or 'pos' in label:
+                return 'positive', score
+            elif 'negative' in label or 'neg' in label:
+                return 'negative', score
+            else:
+                return 'neutral', score
+        except Exception as e:
+            print(f"Error in RoBERTa pipeline prediction: {e}")
+    
+    # Fallback to direct model loading
+    model, tokenizer = load_twitter_roberta_model(model_name)
+    
+    if model is None or tokenizer is None:
+        return analyze_sentiment_simple(text)[0], 0.5
+    
+    try:
+        inputs = tokenizer(text, padding=True, truncation=True, max_length=128, return_tensors="pt")
+        
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+            probs = torch.nn.functional.softmax(logits, dim=-1)
+            predicted_class = logits.argmax(dim=-1).item()
+            confidence = probs[0][predicted_class].item()
+        
+        # Twitter RoBERTa typically has: LABEL_0 (negative), LABEL_1 (neutral), LABEL_2 (positive)
+        # But this can vary, so we'll use the class with highest probability
+        label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+        sentiment = label_map.get(predicted_class, 'neutral')
+        
+        return sentiment, confidence
+    except Exception as e:
+        print(f"Error in RoBERTa prediction: {e}")
+        return analyze_sentiment_simple(text)[0], 0.5
+
+
+def analyze_sentiment(text: str, model_type: str = "simple", model_path: str = None) -> tuple[str, float]:
+    """
+    Unified sentiment analysis function that supports multiple models
+    
+    Args:
+        text: Review text to analyze
+        model_type: One of "simple", "bert", "roberta", "bert-finetuned"
+        model_path: Path to fine-tuned model (required for bert-finetuned)
+    
+    Returns:
+        (sentiment_label, confidence_score) tuple
+    """
+    if not text:
+        return 'neutral', 0.0
+    
+    if model_type == "simple":
+        sentiment, conf_str = analyze_sentiment_simple(text)
+        # Convert confidence string to float
+        conf_map = {'low': 0.3, 'medium': 0.6, 'high': 0.9}
+        confidence = conf_map.get(conf_str, 0.5)
+        return sentiment, confidence
+    
+    elif model_type == "bert" or model_type == "bert-pretrained":
+        return analyze_sentiment_bert(text, model_name="bert-base-cased")
+    
+    elif model_type == "bert-finetuned":
+        if not model_path:
+            st.warning("Model path required for fine-tuned BERT. Using pretrained BERT instead.")
+            return analyze_sentiment_bert(text, model_name="bert-base-cased")
+        return analyze_sentiment_bert(text, model_path=model_path)
+    
+    elif model_type == "roberta" or model_type == "twitter-roberta":
+        return analyze_sentiment_roberta(text)
+    
+    else:
+        # Default to simple
+        return analyze_sentiment_simple(text)[0], 0.5
 
 
 def stream_jsonl(url: str, limit: int | None = None):

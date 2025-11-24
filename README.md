@@ -1,34 +1,58 @@
-# Cadence-Design-Systems-2A-AI-Studio-Project
-#### The goal of this project is to develop an AI system that automatically extracts product features from [Amazon large-scale product review dataset](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023), performs sentiment analysis for each feature, prioritizes issues based on their frequency and severity and generates recommendations for which features to preserve and which to redesign. Building on this analysis, we will create an AI-powered dashboard that enables product teams to efficiently extract actionable insights from thousands of customer reviews, providing clear guidance for product development and improvement.
+# 📦 AI Studio Project — Amazon Review Sentiment Analysis (Fall 2025)
 
-Team Members
-- Dhruhi Sheth
-- Lisa Yu
-- Miller Liu
-- Yong Thu La Wong
-- Tara Rezaei
-- Raghav Sriram
-- Kyi Lei Aye
+This repository contains my end-to-end **Amazon Review Sentiment Analysis** pipeline developed for the **Fall 2025 AI Studio Program**. The project includes full NLP preprocessing, heuristic rules, traditional machine learning models, visualizations, and an interactive **Streamlit dashboard**.
 
-## Milestone 1. Data Exploration & Preprocessing
-### Data Loading 
-There are 34 product categories, and each category contains two JSON files: one for reviews and one for metadata. Using the fsspec library, these JSON files were loaded from HuggingFace and read line by line. With the Pandas library, two DataFrames were created—one for reviews and one for metadata. All review files were consolidated into a single review DataFrame, and all metadata files into a single metadata DataFrame. The two DataFrames were then merged on the asin and parent_asin columns. This combined dataset enables retrieval of customer review content and supports subsequent data cleaning processes. 
+## 🚀 Project Overview
+This project classifies Amazon product reviews into **Positive**, **Neutral**, or **Negative** sentiments. It includes:
+- Complete preprocessing pipeline (cleaning → lemmatization → tokenization → stopword removal)
+- Heuristic scoring (negation, emphasis, sentiment lexicons)
+- Machine learning models for classification
+- Streamlit dashboard fully connected to backend functions
+- Data exploration and visual analytics (word clouds, histograms, sentiment charts)
 
-### Data Cleaning
-Since our first task is doing sentiment analysis on customer feedback review data to classify the good feedback or bad feedback, the relevant columns (rating, title, text, category) in the dataset were extracted. Then, for each column, we checked null values and remove those.
+Future updates will add **BERT**, **RoBERTa**, and **DistilBERT** for transformer-based performance improvements.
 
-### Data Transformation
-#### Text Normalization 
-We removed punctuation from the review text and created a new column containing normalized text reviews.
+## 🗂️ Repository Structure
+AI-Studio-Project/
+├── app.py                # Streamlit app (UI)
+├── utils.py              # Preprocessing + backend functions
+├── models/               # Trained ML models
+├── data/                 # Sample datasets / HF loaders
+├── notebooks/            # Jupyter notebooks for analysis
+├── requirements.txt      # Dependencies
+├── STREAMLIT_README.md   # How to run Streamlit
+└── README.md
 
-#### Lemmatization 
-Text reviews were lemmatized using the WordNetLemmatizer provided by the Natural Language Toolkit (NLTK).
+## 🎛️ Features
 
-#### Mapping Rating Stars to Sentiment Labels
-We assigned sentiment labels according to the rating stars: ratings 1–2 were mapped to “negative,” 3 to “neutral,” and 4–5 to “positive.”
+### 🔍 Sentiment Analysis
+- Single or batch review analysis  
+- Shows each preprocessing step  
+- Predicts sentiment with a confidence score  
+- Lexicon + heuristic + ML hybrid pipeline
 
-#### Text Tokenization
-The text reviews were tokenized into individual words using the word_tokenize function from the Natural Language Toolkit (NLTK).
+### 📊 Data Exploration
+- Load Amazon datasets from HuggingFace  
+- Filter by ratings, categories, sentiment  
+- Visualizations:  
+  - Word clouds  
+  - Sentiment distribution  
+  - Review-length histograms  
+  - Rating vs sentiment breakdown  
 
-## Milestone 2. Model Development & Deployment
-## Milestone 3. Finalization & Presentation
+### 🧠 Machine Learning Models
+- Naive Bayes (Gaussian, Bernoulli, Multinomial)  
+- Logistic Regression  
+- Support Vector Machine  
+- Random Forest  
+- **Coming soon:** BERT, DistilBERT, RoBERTa, ABSA
+
+### 🖥️ Streamlit Dashboard
+- Amazon-themed UI styling  
+- Fully connected to the preprocessing pipeline  
+- Real-time prediction + visualization  
+- Clean navigation with multiple pages (Home, Analysis, Exploration, About)
+
+## 🛠️ Installation
+Clone the repo and install dependencies:
+

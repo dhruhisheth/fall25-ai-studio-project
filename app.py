@@ -7,10 +7,12 @@ from utils import (
     create_sentiment_label,
     load_sample_data,
     analyze_sentiment_simple,
+    analyze_sentiment,
     lemmatize_text,
     tokenize_review,
     create_clean_review,
-    create_clean_title
+    create_clean_title,
+    TRANSFORMERS_AVAILABLE
 )
 import json
 import fsspec
@@ -507,6 +509,8 @@ if 'sample_data' not in st.session_state:
     st.session_state.sample_data = None
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
+if 'bert_model_path' not in st.session_state:
+    st.session_state.bert_model_path = None
 
 # Home Page
 if page == "🏠 Home":
@@ -536,6 +540,47 @@ if page == "🏠 Home":
 elif page == "🔍 Sentiment Analysis":
     st.header("🔍 Sentiment Analysis")
     
+    # Model selection
+    st.subheader("🤖 Model Selection")
+    
+    if TRANSFORMERS_AVAILABLE:
+        model_options = {
+            "Simple Rule-Based": "simple",
+            "BERT (Pretrained)": "bert-pretrained",
+            "Twitter RoBERTa": "twitter-roberta"
+        }
+        
+        selected_model_display = st.selectbox(
+            "Choose a sentiment analysis model:",
+            list(model_options.keys()),
+            help="Select the model to use for sentiment analysis. Transformer models provide more accurate results."
+        )
+        selected_model = model_options[selected_model_display]
+        
+        # Show model info
+        if selected_model == "bert-pretrained":
+            st.info("🤖 Using BERT-base-cased pretrained model. For best results, use a fine-tuned model.")
+        elif selected_model == "twitter-roberta":
+            st.info("🤖 Using Twitter RoBERTa model, optimized for social media and review text.")
+        else:
+            st.info("📝 Using simple rule-based analysis (fast but less accurate).")
+        
+        # Fine-tuned model path input (optional)
+        if selected_model == "bert-pretrained":
+            with st.expander("🔧 Advanced: Use Fine-tuned Model"):
+                st.text_input(
+                    "Fine-tuned Model Path (optional):",
+                    help="Enter the path to your fine-tuned BERT model checkpoint",
+                    key="bert_model_path"
+                )
+    else:
+        st.warning("⚠️ Transformers library not available. Install with: `pip install transformers torch`")
+        st.info("📝 Using simple rule-based analysis only.")
+        selected_model = "simple"
+        selected_model_display = "Simple Rule-Based"
+    
+    st.markdown("---")
+    
     analysis_mode = st.radio(
         "Choose analysis mode:",
         ["Single Review", "Batch Analysis"],
@@ -554,16 +599,23 @@ elif page == "🔍 Sentiment Analysis":
         
         if st.button("Analyze Sentiment", type="primary"):
             if review_text:
-                with st.spinner("Processing review..."):
+                with st.spinner(f"Processing review with {selected_model_display}..."):
                     # Preprocess text
                     processed_text = preprocess_text(review_text)
                     
-                    # Get sentiment
-                    sentiment, confidence = analyze_sentiment_simple(review_text)
+                    # Get sentiment using selected model
+                    if selected_model == "bert-pretrained" and st.session_state.bert_model_path:
+                        sentiment, confidence = analyze_sentiment(
+                            review_text, 
+                            model_type="bert-finetuned",
+                            model_path=st.session_state.bert_model_path
+                        )
+                    else:
+                        sentiment, confidence = analyze_sentiment(review_text, model_type=selected_model)
                     
                     # Display results
                     st.markdown("### Results")
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns(3)
                     
                     with col1:
                         sentiment_emoji = {"positive": "😊", "negative": "😞", "neutral": "😐"}
@@ -575,7 +627,10 @@ elif page == "🔍 Sentiment Analysis":
                         """, unsafe_allow_html=True)
                     
                     with col2:
-                        st.metric("Confidence", confidence)
+                        st.metric("Confidence", f"{confidence:.2%}")
+                    
+                    with col3:
+                        st.metric("Model Used", selected_model_display)
                     
                     # Show processed text with all preprocessing steps from notebook
                     with st.expander("View All Preprocessing Steps (from notebook pipeline)"):
@@ -614,31 +669,61 @@ elif page == "🔍 Sentiment Analysis":
                 reviews_list = [r.strip() for r in reviews_input.split("\n") if r.strip()]
                 
                 results = []
-                for review in reviews_list:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for idx, review in enumerate(reviews_list):
+                    status_text.text(f"Processing review {idx + 1} of {len(reviews_list)}...")
                     processed = preprocess_text(review)
-                    sentiment, _ = analyze_sentiment_simple(review)
+                    
+                    # Use selected model for batch analysis
+                    if selected_model == "bert-pretrained" and st.session_state.bert_model_path:
+                        sentiment, confidence = analyze_sentiment(
+                            review, 
+                            model_type="bert-finetuned",
+                            model_path=st.session_state.bert_model_path
+                        )
+                    else:
+                        sentiment, confidence = analyze_sentiment(review, model_type=selected_model)
+                    
                     results.append({
                         "Review": review[:100] + "..." if len(review) > 100 else review,
                         "Sentiment": sentiment,
+                        "Confidence": f"{confidence:.2%}",
                         "Processed": processed[:50] + "..." if len(processed) > 50 else processed
                     })
+                    progress_bar.progress((idx + 1) / len(reviews_list))
+                
+                progress_bar.empty()
+                status_text.empty()
                 
                 results_df = pd.DataFrame(results)
                 st.dataframe(results_df, use_container_width=True)
                 
                 # Sentiment distribution
-                sentiment_counts = results_df['Sentiment'].value_counts()
-                fig = px.pie(
-                    values=sentiment_counts.values,
-                    names=sentiment_counts.index,
-                    title="Sentiment Distribution",
-                    color_discrete_map={
-                        "positive": "#28a745",
-                        "negative": "#dc3545",
-                        "neutral": "#FF9900"
-                    }
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    sentiment_counts = results_df['Sentiment'].value_counts()
+                    fig = px.pie(
+                        values=sentiment_counts.values,
+                        names=sentiment_counts.index,
+                        title="Sentiment Distribution",
+                        color_discrete_map={
+                            "positive": "#28a745",
+                            "negative": "#dc3545",
+                            "neutral": "#FF9900"
+                        }
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Confidence distribution
+                    results_df['Confidence_Num'] = results_df['Confidence'].str.rstrip('%').astype('float') / 100
+                    avg_confidence = results_df['Confidence_Num'].mean()
+                    st.metric("Average Confidence", f"{avg_confidence:.2%}")
+                    st.metric("Total Reviews Analyzed", len(results_df))
+                    st.metric("Model Used", selected_model_display)
             else:
                 st.warning("Please enter at least one review to analyze.")
 

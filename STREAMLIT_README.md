@@ -36,9 +36,14 @@ This Streamlit dashboard provides a user-friendly interface for analyzing Amazon
 - Quick statistics
 
 ### 🔍 Sentiment Analysis
-- **Single Review**: Analyze individual reviews with sentiment classification
-- **Batch Analysis**: Process multiple reviews at once
+- **Model Selection**: Choose from multiple sentiment analysis models:
+  - **Simple Rule-Based**: Fast keyword-based analysis (no ML required)
+  - **BERT (Pretrained)**: State-of-the-art transformer model for accurate sentiment classification
+  - **Twitter RoBERTa**: Optimized for social media and review text
+- **Single Review**: Analyze individual reviews with sentiment classification and confidence scores
+- **Batch Analysis**: Process multiple reviews at once with progress tracking
 - View processed text and sentiment results
+- Support for fine-tuned BERT models (advanced users)
 
 ### 📈 Data Exploration
 - Load sample review data
@@ -69,9 +74,23 @@ For demonstration purposes, the dashboard includes mock data that will be used i
 
 ## Notes
 
-- The dashboard uses rule-based sentiment analysis for demonstration
-- For production use, integrate trained models from the other branches (e.g., `Bert-base-cased-model`, `twitter-roberta-base-sentiment`)
+- **Transformer Models**: The dashboard now includes support for BERT and Twitter RoBERTa models
+- **Model Loading**: Transformer models are loaded on-demand and cached for performance
+- **Fine-tuned Models**: You can use your own fine-tuned BERT models by providing the model checkpoint path
+- **Fallback**: If transformer libraries are not available, the dashboard automatically falls back to rule-based analysis
 - Full dataset loading requires HuggingFace authentication
+
+## Using Fine-tuned Models
+
+If you have a fine-tuned BERT model from training (e.g., from the `Bert-base-cased-model` branch):
+
+1. Save your model checkpoint to a local directory
+2. In the dashboard, select "BERT (Pretrained)" as your model
+3. Expand "Advanced: Use Fine-tuned Model"
+4. Enter the path to your model checkpoint directory
+5. The dashboard will use your fine-tuned model for predictions
+
+Example model path: `/path/to/checkpoint-89250` or `./models/bert-finetuned`
 
 ## Troubleshooting
 
